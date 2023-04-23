@@ -1,0 +1,69 @@
+CONFIGURE EXTENDED ACL'S
+A)
+OBJECTIVE:-
+*configure,apply and verify an extended numbered acl
+*configure,apply and verify an extended named acl
+
+		PART 1: CONFIRURE ROYTER 
+
+STEP1: configure password for vty lines
+R1(config)#line vty 0 4
+R1(config-line)#password vtypa55
+R1(config-line)#login
+
+STEP 2: CONFIGURE SECRET PASSWORD AN ROUTER
+R1(config)#enable secret enpa55
+
+		PART 2: CONFIGURE,APPLY AND VERIFY & EXTENDED NUMBERED ACL
+
+STEP 1: configure an acl to permit ftp and icmp
+R1(config)#access-list 100 permit tcp 172.22.34.64 0.0.0.31 host 172.22.34.62 eq ftp
+R1(config)#access-list 100 permit icmp 172.22.34.64 0.0.0.31 host 172.22.34.62
+
+STEP 2: APPLY THE ACL ON THE CORRECT INTERFACE TO TRAFFIC 
+R1(config)#int gig 0/0
+R1(config-if)#ip access-group 100 in
+
+STEP 3: VERIFY THE ACL IMPLEMENTATION
+a.ping from pcl to server.
+  pcl>ping 172.22.34.62
+  Successful
+
+b.ftp from pc1 to server.
+  the username and password are both cisco.
+  pc1> ftp 172.22.34.62
+
+c.exit the ftp service of the server.
+  ftp>quit
+
+d.ping from pc1 to pc2.
+pc1>ping 172.22.34.98
+Unsuccessful
+
+		PART 3: CONFIGURE,APPLY & VERIFY AN EXTENDED NAMED ACL
+
+STEP 1: configure an acl to permit http access and icmp
+R1(config)#ip access-list extended HTTP_only
+R1(config-ext-nacl)#permit tcp 172.22.34.96 0.0.0.15 host 172.22.34.62 eq www
+R1(config-ext-nacl)#permit icmp 172.22.34.96 0.0.0.15 host 172.22.34.62
+
+STEP 2: apply the cal on the correct interface to filter traffic
+R1(config)#int gig 0/1
+R1(config-if)#ip access-group HTTP_ONLY in
+
+STEP 3: VERIFY the acl implementation
+a.ping from pc2 to server
+  pc2>ping 172.22.34.62
+Successful
+
+b.ftp from pc2 to server.
+  pc2> ftp 172.22..34.62
+Unsuccessful
+
+c.open the web browser on pc2
+  in url TYPE-> http:// 172.22.34.62
+Successful
+
+d.ping from pc2 to pc1
+  pc>ping 172.22.34.66
+Unsuccessful

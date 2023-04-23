@@ -1,0 +1,129 @@
+B)
+OBJECTIVE: 
+configure,apply and verify an extended numbered acl
+
+		PART 1: CONFIGURE SWITCH AND ROUTER 
+
+STEP 1: CONFIGURE SWITCH AND ROUTER
+SWA(config)#int vlan1
+SWA(config-if)#ip address 10.101.117.50 255.255.255.248
+SWA(config-if)#no shut
+SWA(config-if)#ip default-gateway 10.101.117.49
+
+SWB(config)#int vlan1
+SWB(config-if)#ip address 10.101.117.34 255.255.255.240
+SWB(config-if)#no shut
+SWB(config-if)#ip default-gateway 10.101.117.33
+
+SWC(config)#int vlan1
+SWC(config-if)#ip address 10.101.117.2 255.255.255.224
+SWC(config-if)#no shut
+SWC(config-if)#ip default-gateway 10.101.117.1
+
+STEP 2: CONFIGURE THE SECRET ON ROUTER AND SWITCH
+(Execute command on all switch and router)
+RTA/SW(config)#enable secret enpa55
+
+STEP 3: CONFIGURE THE CONSOLE PASSWORD AN ROUTER AND SWITCH
+(Execute command on all switch and router)
+RTA/SW(config)#lineconsole 0
+RTA/SW(config)#password conpa55
+RTA/SW(config)#login
+
+STEP 4: TEST CONNECTIVITY
+ping from pca to pcb
+pca>ping 10.101.117.35
+(Successful)
+
+pca>ping 10.101.117.2
+(Successful)
+
+pcb>ping 10.101.117.2
+(Successful)
+
+		PART 2: CONFIGURE SWITCH AND ROUTER TO SUPPORT SSH CONNECTION
+
+STEP 1: CONFIGURE DOMAIN NAME AND CRYPTO KEY FOR USE WITH SSH
+(all switch/router)
+RTA/SW(config)#ip domain-name conasecurity.com
+
+STEP 2: CONFIGURE USERS TO LOGIN TO SSH
+(all switch/router)
+RTA/SW(config)#username admin secret adminpa55
+
+STEP 3: CONFIGURE INCOMING VTY LINES
+(all switch/router)
+RTA/SW(config)#line vty 04
+RTA/SW(config-line)#login local
+RTA/SW(config)#crypto key generate rsa
+1024
+
+STEP 4: VERIFY THE SSH CONNECTION
+
+pca> ssh -1 admin 10.101.117.34
+password: adminpa55
+swb>
+
+pca> ssh -1 admin 10.101.117.2
+password: adminpa55
+swc>
+
+pcb> ssh -1 admin 10.101.117.50
+password: adminpa55
+swa>
+
+pcb> ssh -1 admin 10.101.117.2
+password: adminpa55
+swc>
+
+swc> ssh -1 admin 10.101.117.50
+password: adminpa55
+swa>
+
+swc> ssh -1 admin 10.101.117.34
+password: adminpa55
+swa>
+
+		PART 3: CONFIGURE APPLY AND VERIFY AN EXTENDED NUMBERED ACL
+
+STEP 1: CONFIGURE THE EXTENDED ACL
+RTA(config)#access-list 199 permit tcp 10.101.117.32 0.0.0.15 10.101.117.0 0.0.0.31 eq 22
+RTA(config)#access-list 199 permit icmp any any
+
+STEP 2: APPLY THE EXTEND ACL
+RTA(config)#int gig0/2
+RTA(config-if)#ip access-group 199 out
+
+STEP 3: VERIFY THE EXTENDED ACL IMPLEMENTATION
+a. ping from pcb to all the other ip addresses in the network.
+   pcb>ping 10.101.117.51
+	(Successful)
+   pcb>ping 10.101.117.2
+	(Successful)
+
+b. ssh from pcb to swc
+   pcb>ssh -1 admin 10.101.117.2
+   password: adminpa55
+   swc>
+
+c. exit the ssh session to swc
+  swc>exit
+
+d. ping from pca to all the other ip addresses in the network 
+   pca>ping 10.101.117.35
+	(Successful)
+   pca>ping 10.101.117.2
+	(Successful)
+
+e. ssh from pca to swc
+   pca>ssh -1 admin 10.101.117.2
+
+f. ssh from pca to swb 
+   pca>ssh -1 admin 10.101.117.34
+   password: adminpa55
+
+g. After logging into swb do not log out.
+   ssh to swc in privileage exec mode.
+   swb#ssh -1 admin 10.101.117.2
+   password:adminpa55
+   swc>

@@ -1,0 +1,145 @@
+CONFIGURE IOS INTRUSION PREVENTION SYSTEM (IPS)
+OBJECTIVE:-
+*enable IOS IPS
+*configure logging
+*modify IPS signature
+*verify IPS
+
+PART1: CONFIGURE ROUTER
+
+STEP1: configure secret on router
+(Execute command on all router)
+R(config)#enable secret enpa55
+
+STEP2: configure console password on router
+(Execute command on all router)
+R(config)#line console 0
+R(config-line)#password conpa55
+R(config-line)#login
+
+STEP3: configure SSH ligin on router
+(Execute command on all router)
+R(config)#ip domain-name ccnasecurity.com
+R(config)#username admin secret adminpa55
+R(config)line vty 0 4
+R(config-line)#login local
+R(config)#crypto key generate rsa
+How many bits [512]: 1024
+
+STEP4: configure OSPF on router
+R1(config)#router ospf 1
+R1(config-router)#network 192.168.1.0 0.0.0.255 area 0
+R1(config-router)#network 10.1.1.0 0.0.0.3 area 0
+
+R2(config)#router ospf 1
+R2(config-router)#network 10.1.1.0 0.0.0.3 area 0
+R2(config-router)#network 10.2.2.0 0.0.0.3 area 0
+
+R3(config)#router ospf 1
+R3(config-router)#network 10.2.2.0 0.0.0.3 area 0
+R3(config-router)#network 192.168.3.0 0.0.0.255 area 0
+
+STEP5: verify network connectivity
+PCA>ping 192.168.3.2 (success)
+PCC>ping 192.168.1.2 (success)
+
+PART2: ENABLE IOS IPS
+
+STEP1: verify the security technology package
+R1#show version
+(output)
+
+Technology PAckage License Information for module "c1900"
+Technology	Technology-package	Technology-package
+		current		type		next	reboot
+
+ipbase		ipbasek9	permanent	ipbasek9
+security	none		none		none
+data		none		none		none
+
+STEP2: enable security technology package
+R1(config)#license boot module c1900 technology-package securityk9
+
+STEP3: save runnng config and reload router
+R1#copy run start
+R1#reload
+
+SETP4: verify the security technology package
+R1#show version
+(output)
+
+Technology PAckage License Information for module "c1900"
+Technology	Technology-package	Technology-package
+		current		type		next	reboot
+
+ipbase		ipbasek9	permanent	ipbasek9
+security	securityk9	evaluation	securtiyk9
+data		disable		none		none
+
+STEP5: create an IOS IPS configuration directory in flash
+R1#mkdir ipsdir
+create directory filename [ipsdir]? <Enter>
+
+STEP6: configure IPS signature storage location
+R1(config)#ip ips config location flash:ipsdir
+
+STEP7: create an IPS rule
+R1(config)#ip ips name iosips
+
+STEP8: enable logging
+R1(config)#ip ips notify log
+R1#clock set hr:min:sec date month year (enter current data)
+R1(config)#service timestamps log datetime msec
+R1(config)#logging host 192.168.1.50
+
+STEP9: configure IOS IPSto use signature categories
+R1(config)#ip ips signature-category
+R1(config-ips-category)#category all
+R1(config-ips-category-action)#retired true
+R1(config-ips-category-action)#exit
+R1(config-ips-category)category ios_ips basic
+R1(config-ips-category-action)#retired false
+R1(config-ips-category-action)#exit
+R1(config-ips-category)#exit
+Do you want to accept changes? [confirm] <Enter>
+
+Step10: apply IPS rule to interface
+R1(config)#int gig0/0
+R1(config-if)#ip ips iosips out
+
+STEP11: use show commands to verify IPS
+R1#show ip ips  all
+(output)
+
+STEP12: view syslog message
+Click syslog server-- Services tab-- SYSLOG
+(output)
+
+PART3: MODIFY THE SIGNATURE
+
+STEP1: change the event-action of signature
+R1(config)#ip ips signature-definition
+R1(config-sigdef)#signature 2004 0
+R1(config-sigdef-sig)#status
+R1(config-sigdef-sig-status)#retired false
+R1(config-sigdef-sig-status)#enable true
+R1(config-sigdef-sig-status)#exit
+R1(config-sigdef-sig)#engine
+R1(config-sigdef-sig-engine)#event-action produce-alert
+R1(config-sigdef-sig-engine)#event-action deny-packet-inline
+R1(config-sigdef-sig-engine)#exit
+R1(config-sigdef-sig)#exit
+R1(config-sigdef)#exit
+Do you want to accept these changes? [confirm] <Enter>
+
+STEP2: use show commands to verify IPS
+R1#show ip ips all
+(output)
+
+STEP3: verify that IPS is working property
+PCC>ping 192.168.1.2 (unsuccess-- time out)
+PCA>ping 192.168.1.2 (success)
+
+STEP4: verify syslog message
+SYSLOG server
+(output)

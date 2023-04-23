@@ -1,0 +1,161 @@
+CONFIGURE ZONE BASED POLICY FIREWALL (ZPF)
+OBJECTIVE:-
+*verify connectivity among devices before firewall configuration
+*configure a zone based policy firewall on R3
+*verify ZPF functionality using ping, and web browser
+
+PART 1: CONFIGURE ROUTER
+
+STEP1: configure console password
+Execute command on all routers
+R(config)#line console 0
+R(config-line)#password conpa55
+R(config-line)#login
+
+STEP2: configure password for vty lines
+Execute command on all routers
+R(config)#line vty 0 4
+R(config-line)#password vtypa55
+R(config-line)#login
+
+STEP3: configure secret on router
+Execute command on all router
+R(config)#enable secret enpa55
+
+STEP4: configure SSH login on router
+Execute command on all routers
+R(config)#ip domain-name ccnasecurity.com
+R(config)#username admin secret adminpa55
+R(config)#line vty 0 4
+R(config-line)#login local
+R(config-line)#crypto key generate rsa
+How many bits [512]: 1024
+
+STEP5: configure static on routers
+R1(config)#ip route 10.2.2.0 255.255.255.252 10.1.1.2
+R1(config)#ip route 192.168.3.0 255.255.255.0 10.1.1.2 
+
+R2(config)#ip route 192.168.1.0 255.255.255.0 10.1.1.1
+R2(config)#ip route 192.168.3.0 255.255.255.0 10.2.2.1 
+
+R3(config)#ip route 192.168.1.0 255.255.255.0 10.2.2.2
+R3(config)#ip route 10.1.1.0 255.255.255.252 10.2.2.2
+
+a. PCA>ping 192.168.3.3 (success)
+
+b. access R2 ussing ssh
+PCC>ssh -l admin 10.2.2.2
+password: adminpa55
+P2>exit
+
+c. from PCC open web browser to PCA server
+Desktop-- Web Browser-- URL: http://192.168.1.3 (success)
+
+PART2: CREATE THE FIREWALL ZONE ON R3
+
+STEP1: verify that security technology package
+R3#show version
+
+output--
+
+ipbase		ipbasek9	permanent	ipbasek9
+security	none		none		none
+data 		none		none		none
+
+STEP2: enable security tecjnology package
+R3(config)#license boot module c1900 technology-package securityk9
+
+STEP3: save the rinning-config and reload router
+R3#copy run start
+R3#reload
+
+STEP4: verify the security technology package
+R3#show version
+
+ipbase		ipbasek9	permanent	ipbasek9
+security	securityk9	evaluation	securityk9
+data		disable		none		none
+
+STEP5: create an internal zone
+R3(config)#zone security IN-ZONE
+R3(config-sec-zone)#exit
+
+STEP6: create an external zone
+R3(config)#zone security OUT-ZONE
+R3(config-sec-zone)#exit
+
+PART3: IDENTIFY TRAFFIC USING CLASS-MAP
+
+STEP1: create ACL that defines internal traffic
+R3(config)#access-list 101 permit ip 192.168.3.0 0.0.0.255 any
+
+STEP2: create class map referencing internal traffic ACL
+R3(config)#class-map type inspect match-all IN-NET-CLASS-MAP
+R3(config-cmap)#match access-group 101
+R3(config-cmap)#exit
+
+PART4: SPECIFY FIREWALL POLICIES
+
+STEP1; create a policy map to determine what to do with matched traffic
+R3(config)#policy-map type inspect IN-2-OUT-PMAP
+
+STEP2: specify class type of inspect and reference class map IN-NET-CLASS-MAP
+R3(config-pmap)#class type inspect IN-NET-CLASS-MAP
+
+STEP3: specify action of inspect for this policy map
+R3(config-pmap-c)#inspect
+R3(config-pmap-c)#exit
+R3(config-pmap)#exit
+
+PART5: APPLY FRIREWALL POLICIES
+
+STEP1: create a pair of zones
+R3(config)#zone-pair security IN-2-OUT-ZPAIR source IN-ZONE destination OUT-ZONE
+
+STEP2: specify policy map for handling traffic between two zones
+R3(config-sec-zone-pair)#service-policy type inspect IN-2-OUT-PMAP
+R3(config-sec-zone-pair)#exit
+
+STEP3: assign interfaces to appropriate security zones
+R3(config)#int gig0/0
+R3(config-if)#zone-member security IN-ZONE
+R3(config-if)#exit
+R3(config)#int se0/1/0
+R3(config-if)#zone-member security OUT-ZONE
+R3(config-if)#exit
+
+STEP4: copy the running configuration to startup configuration
+R3#copy run start
+R3#reload
+
+PART6: TEST FIREWALL FUNCTIONALITY FROM IN-ZONE TO OUT-ZONE
+
+STEP1: from internal PCC ping external PCA server
+PCC>ping 192.168.1.3 (success)
+
+STEP2: access R2 using SSH
+PCC>ssh -l admin 10.2.2.2
+Password: adminpa55
+R2>
+
+STEP3: view established sessions
+R3#show policy-map type inspect zone-pair sessions
+(session will be established)
+
+STEP4: from PCC exit SSH session on R2 and close command prompt
+R2>exit
+
+STEP5: from internal PCC open web browser to PCA server web page
+Desktop-- Web Browser-- URL: http://192.168.1.3 (success)
+
+STEP6: view extablished sessions
+R3#show policy-map type inspect zone-pair sessions
+(session will be established)
+
+PART7: TEST FIREWALL FUNCTIONALITY FROM OUT-ZONE TO IN-ZONE
+
+STEP1: from internal PCA ping the external PCC server
+PCA>ping 192.168.3.3 (unsuccess-- time out)
+
+STEP2: from R2 ping PCC
+R2#ping 192.168.3.3 (unsuccess-- time out)

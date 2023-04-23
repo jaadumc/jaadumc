@@ -1,0 +1,80 @@
+PRACTICAL 7: LAYER 2 SECURITY
+OBJECTIVES:-
+*assign central switch as root bridge
+*secure-spanning tree parameter to prevent STP manipulation attacks
+*enable part secutiy toprevent CAM table
+
+		PART1: CONFIGURE SWITCH/ROUTER
+
+STEP1: configure secret
+(Execute command on all switch and router)
+R1/SW(config)#enable secret enpa55
+
+STEP2: configure console passsword
+(Execute command on all switch and router)
+R1/SW(config)#line console 0
+R1/SW(config-line)#password conpa55
+R1/SW(config-line)#login
+
+STEP3: configure SSH login
+(Execute commadn on all switch and router)
+R1/SW(config)#ip domain-name ccnasecurity.com
+R1/SW(config)#username admin secret adminpa55
+R1/SW(config)#line vty 0 4
+R1/Sw(config-line)#login local
+R1/SW(config-line)#crypto key generate rsa
+
+		PART2: CONFIGURE ROOT BRIDGE
+
+STEP1: determine the current root bridge
+SW#show spanning-tree
+(output)
+
+Spanning-tree enabled protocol IEEE
+This bridge is the root.
+
+STEP2: assign central as primary root bridge
+	
+STEP3: assign Sw-1 as secondary root bridge
+SW1(config)#spanning-tree vlan 1 root secondary
+SW1#show spanning tree
+(output)
+
+		PART3: PROTECT AGAINST SSTP ATTACK
+
+STEP1: enable port fast on all access ports
+SWA/B(config)#int range fa0/1-4
+SWA/B(config-if-range)#spanning-tree post fast
+
+STEP2: enable BPDU guard on all access ports
+SWA/B(config)#int range fa0/1-4
+SWA/B(config-if-range)#spanning-tree bpduguard enable
+
+STEP3: enable root guard
+SW1/2(config)#int range fa0/23-24
+SW1/2(config-if-range)#spanning-tree guard root
+
+		PART4: CONFIGURE PORT SECURITY AND DISABLE UNUSED PORTS
+STEP1: configure basic port security on all ports connected to host devices
+SWA/B(config)#int range fa0/1-22
+SWA/B(config-if-range)#switchport mode access
+SWA/B(config-if-range)#switchport port-security
+SWA/B(config-if-range)#switchport port-security maximum 2
+SWA/B(config-if-range)#switchport port-security violation shutdown
+SWA/B(config-if-range)#switchport port-security mac-address sticky
+
+STEP2: verify port security
+SWA/B#show port-security int fa0/1
+(output)
+
+STEP3: desabled unused ports
+SWA/B(config)#int range fa0/5-22
+SWA/B(config-if-range)#shutdown
+
+STEP4: verify connectivity
+C1>ping 10.1.1.11 (success)
+C1>ping 10.1.1.14 (success)
+
+STEP5: verify port security
+SWA/B #show port-security int fa0/1
+(output)

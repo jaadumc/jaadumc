@@ -1,0 +1,267 @@
+ PRACTICAL 10:CONFIGURE ASA BASIC SETTINGS AND FIREWALL
+OBJECTIVE:
+*verify connectivity and explore the ASA
+*configure basic ASA settings and interface security
+*configure routing,address translation,and interace security level using CLI.
+*configure DHCP,AAA and SSH
+*configure DMZ,static NAT and ACLs.
+
+PART 1: CONFIGURE ROUTER
+
+STEP 1: configure secret on router 
+Execute command on all routers 
+R(config)#enable secret enpa55
+
+STEP 2:configure console password on router 
+Execute command on all router
+R(config)#line console 0
+R(config-line)#password conpa55
+R(config-line)#login
+
+STEP 3:configure SSH login on router
+Execute command on all router
+R(config)#ip domain-name ccnasecurity.com
+R(config)#username admin password adminpa55
+R(config)#line vty 0 4
+R(config-line)#login local 
+R(config)#crypto key generate rsa
+How many bits in the module [512]:1024
+
+STEP 4:Configure OSPF or router
+R1(config)#router ospf 1
+R1(config-router)#network 209.165.200.0 0.0.0.7 area 0
+R1(config-router)#network 10.1.1.0 0.0.0.3 area 0  
+
+R2(config)#router ospf 1 
+R2(config-router)#network 10.1.1.0 0.0.0.3 area 0
+R2(config-router)#network 10.2.2.0 0.0.0.3 area 0
+
+R3(config)#router ospf 1 
+R3(config-router)#network 172.16.3.0 0.0.0.255 area 0
+R3(config-router)#network 10.2.2.0 0.0.0.3 area 0
+
+Step 5:Verify connectivity
+send packet from:
+PCC->R1,R2,R3
+(successful)
+send packet from:
+PCC->ASA,PC-B, DMZ server
+(unsucessful)
+
+
+PART 2: EXPLORE THE ASA
+
+Step 1:Determine the ASA version,interfaces and license.
+Enter privileged EXEC mode
+ASA#en
+a password has not been set
+Press enter when promoted for a password 
+ASA#show version
+
+Hardware:ASA5505,512 MB,RAM,CPU,Geode 500 Mhz
+Internal ATA Compact flash ,D8MB
+
+Step 2:Determine the file system and contents of the flash memory
+ASA#show file system 
+
+
+PART 3: CONFIGURE ASA SETTINGS AND INTERFACE SECURITY
+
+Step 1:Configure the hostname and domain name 
+ASA(config)#hostname CCNAS-ASA
+CCNA-ASA(config)#domain-name ccnasecurity.com
+
+Step 2:Configure the enable mode password
+CCNA-ASA(config)#enable password enpa55
+
+Step 3:Set the date and time
+CCNAS-ASA(config)#clock set hr:min:sec date:month:year
+
+Step 4:Configure the inside and outside interfaces
+CCNAS-ASA(config)#int vlan 1
+CCNAS-ASA(config-if)#nameif inside
+CCNAS-ASA(config-if)#ip address 192.168.1.1 255.255.255.0
+CCNAS-ASA(config-if)#security-level 100
+CCNAS-ASA(config-if)#int vlan 2
+CCNAS-ASA(config-if)#nameif outside
+CCNAS-ASA(config-if)#ip address 209.165.200.226 255.255.255.248
+CCNAS-ASA(config-if)#security-level 0
+
+Step 5:Check the Configurations
+CCNAS-ASA# show int ip brief
+
+Interface			IP address		ok?		method		status		protocol
+Ethernet0/0		unassigned		YES		unset		up			up
+Ethernet0/1		unassigned		YES		unset		up			up
+Ethernet0/2		unassigned		YES		unset		up			up
+Ethernet0/3		unassigned		YES		unset		down		down
+Ethernet0/4		unassigned		YES		unset		down		down
+Ethernet0/5		unassigned		YES		unset		down		down
+Ethernet0/6		unassigned		YES		unset		down		down
+Ethernet0/7		unassigned		YES		unset		down		down
+vlan 1			192.168.1.1		YES		unset		up			up
+vlan 2			209.165.200.226	YES		unset		up			up
+
+CCNAS-ASA#show ip address
+
+system ip address
+
+Interface		name 		ip address		subnet mask 		method
+vlan 1		inside		192.168.1.1		255.255.255.0		manual
+vlan 2		outside		209.165.200.226	255.255.255.248	manual
+
+CCNAS-ASA#show switch vlan
+
+vlan			name 		status		ports
+1			inside		up			Et0/1,Et0/2,Et0/3,Et0/4,Et0/5,Et0/6,Et0/7
+2			outside		up			Et0/0
+
+Step 3:Test connectivity to the ASA(send packets)
+PCB-> ASA
+(successful)
+PCB->R1
+(unsuccessful)
+
+PART 4: CONFIGURE  ROUTING,ADDRESS TRANSACTION AND INSPECTION POLICY
+
+step 1: configure a static default router for the ASA 
+CCNAS-ASA #show route
+
+C 192.168.1.0  255.255.255.0 directly connected inside vlan1 205.165.200.0129 is subnetted, 2 subnets
+
+C 209.165.200.0 255.255.255.248 is directly connected outside vlan2
+
+C 209.165.200.224 255.255.255.248 is directly connected outside vlan2
+
+CCNAS-ASA(config)#route outside 0.0.0.0 0.0.0.0 201.165.200.225
+CCNAS-ASA #show route
+
+C 192.168.1.0  255.255.255.0 directly connected inside vlan1 209.165.200.0129 is subnetted, 2 subnets
+
+C 209.165.200.0 255.255.255.248 is directly connected inside vlan1
+
+C 209.165.200.224 255.255.255.248 is directly connected outside vlan2
+
+st 0.0.010 (110) via 209.168.200.226
+
+step 2: Test connectivity (send packets)
+ASA->R1
+(successful)
+
+step 3: configure address translation using PAT & network objects.
+CCANAS-ASA(config)#object network include-net
+CCNAS-ASA(config-network-object)#subnet 192.168.1.0 255.255.255.0
+CCNAS-ASA(config-network-object)#not (inside,outside) dynamic interface
+CCNA-ASA(config-network-object)#end
+
+step 4: Test connectivity
+CCNA-ASA #show run
+
+object network inside-net
+subnet192.168.1.0 255.255.255.0
+
+PCB->R1(send packets)
+(Unsuccessful)
+CCNA-ASA #show nat
+
+Auto NAT policies (section2)
+(inside) to (outside) source dyanamic inside-net interface
+translate-hits=1,untranslate-hits=1
+
+step 5: Modify the default MPF application inspection global service policy
+CCNAS-ASA(config)#class-nap inspection-default
+CCNAS-ASA(config-map)#match default-inspection traffic
+CCNAS-ASA(config-map)#exit
+CCNAS-ASA(config)#poicy-map global policy.
+CCNAS-ASA(config-pmap)#class inspection default
+CCNAS-ASA(config-pmap-c)#inspect icmp
+CCNAS-ASA(config-pmap-c)#exit
+CCNAS-ASA(config)#service policy global policy global
+
+step 6: Test connectivity(send packets)
+PCB->R1
+(successful)
+
+PART 5:CONFIGURE DHCP,AAA AND SSH
+
+step 1: configure the ASA as a DHCP server.
+(CCNAS-ASA(config)#dhcpd address 192.168.1.5- 192.168.1.36 inside
+CCNAS-ASA(config)#dhcpd dns 209.165.201.2 int inside
+CCNAS-ASA(config)#dhcpd enable inside
+CCNAS-ASA(config)#dhcpd enable inside
+
+change PC-B from a static IP addresses to a DHCP client,and verify that it receives IP addressing information.
+
+step 2: comfigure AAA to use the local database for authentication
+CCNAS-ASA(config)#username admin password adminpa55
+CCNAS-ASA(config)#aaa authentication ssh console LOCAL.
+
+step 3:configure remote access to the ASA
+CCNAS-ASA(config)#crypto key generate rsa modulus 1024
+Do you really want to replace them?[yes/no]:no
+CCNAS-ASA(config)#ssh 192.168.1.0 255.255.255.0 inside
+CCNAS-ASA(config)#ssh 172.16.3.3 255.255.255.255 outside
+CCNAS-ASA(config)#ssh timeout 10.
+
+step 4: verify ssh session
+PCB > ssh-1 admin 192.168.1.1
+Password : adminpa55
+CCNA-ASA > exit
+PCC> ssh-1 admin 209.168.200.226
+Password: adminpa55
+CCNAS-ASA > exit
+
+PART 6:CONFIGURE A DMZ,STATIC NAT AND ACLS
+
+step 1: configure the DMZ interface VLAN3 on the ASA.
+CCNAS-ASA(config)#int vlan3
+CCNAS-ASA(config-if)#ip address 192.168.2.1 255.255.255.0
+CCNAS-ASA(config-if)#no forward int vlan1
+CCNAS-ASA(config-if)#nameif dmz
+CCNAS-ASA(config-if)#security-level 70
+CCNAS-ASA(config-if)#int et0/2
+CCNAS-ASA(config-if)#switchport access vlan3
+
+step 2: check the configurations
+CCNAS-ASA #show int ip brief
+
+Interface		IP Address		ok?		method		status	protocol
+Ethernet0/0		unassigned		YES	unset		up			up
+Ethernet0/1		unassigned		YES	unset		up			up
+Ethernet0/2		unassigned		YES	unset		up			up
+Ethernet0/3		unassigned		YES	unset		down			down
+Ethernet0/4		unassigned		YES	unset		down			down
+Ethernet0/5		unassigned		YES	unset		down			down
+Ethernet0/6		unassigned		YES	unset		down			down
+Ethernet0/7		unassigned		YES	unset		down			down
+vlan1			192.168.1.1		YES	manual		up			up
+vlan2			109.165.200.226		YES	manual		up			up
+vlan3			192.168.2.1		YES	manual		up			up
+
+CCNAS-ASA #show ip address
+system IP Addresses:
+Interface	Name		IP Address		subnet mask		method
+vlan1		inside	192.168.1.1		255.255.255.0	manual
+vlan2		outside	209.165.200.226	255.255.255.0	manual
+vlan3		dmz		192.168.2.1		255.255.255.0	manual
+
+CCNAS-ASA #show switch vlan
+
+VLAN	Name		status	Port
+1	inside			up	   	Et0/1,Et0/3,Et0/4,Et0/5,Et0/6,Et0/7
+2	outside			up		Et0/0
+3	dmz				up		Et0/2
+
+step 3: configure static NAT to the DMZ server using a network object
+CCNAS-ASA(config)#object network dmz_server
+CCNAS-ASA(config-network-object)#host 192.168.2.3
+CCNAS-ASA(config-network-object)#nat(dmz,outside)static 209.165.200.227
+CCNAS-ASA(config-network-object)#exit
+
+step 4: Configure an ACL to allow access to the DMZ from the internet
+CCNAS-ASA(config)#access-list OUTSIDE-DMZ permit icmp any host 192.168.2.3
+CCNAS-ASA(config)#access-list OUTSIDE-DMZ permit tcp any host 192.168.2.3 eq80
+CCNAS-ASA(config)#access-group OUTSIDE-DHL in int outside.
+
+step 5: Test access to the DMZ server.
+The ability to successfully test outside to the DMZ web server was not in place,therefore,successful testing is not required.

@@ -1,0 +1,184 @@
+SITE TO SITE IPSEC VPN USING CLI
+OBJECTIVES:-
+*verify connectivity throughout the network
+*configure R1 to support a site-to-siteIPsec VPN with R3
+
+PART1: CONFIGURE ROUTER
+
+STEP1: configure secret on router
+(Execute command on all router)
+R(config)#enable secret enpa55
+
+STEP2: configure console password on router
+(Execute command on all router)
+R(config)#line console 0
+R(config)#password conpa55
+R(config-line)#login
+
+STEP3: configure SSH login on router
+R(config)#ip domain-name ccnasecurity.com
+R(config)#username admin secret adminpa55
+R(config)#line vty 0 4
+R(config-line)#login local
+R(config)#crypto key generate rsa
+How many bits [512]: 1024
+
+STEP4: configure ospf on router
+R1(config)#router ospf 1
+R1(config)#network 192.168.1.0 0.0.0.255 area 0
+R1(config)#network 10.1.1.0 0.0.0.3 area 0
+
+R2(config)router ospf 1
+R2(config)#network 192.168.2.0 0.0.0.255 area 0
+R2(config)#network 10.2.2.0 0.0.0.3 area 0
+R2(config)#network 10.1.1.0 0.0.0.3 area 0
+
+R3(config)#router ospf 1
+R3(config)#network 192.168.3.0 0.0.0.255 area 0
+R3(config)#network 10.2.2.0 0.0.0.3 area 0
+
+STEP5: verify connectivity
+From PCA verify connectivity
+PCA>ping 192.168.3.3 (success)
+PCA>ping 192.168.2.3 (success)
+PCB>ping 192.168.3.3 (success)
+
+PART2: CONFIGURE IPsec PARAMETERS ON R1
+
+STEP1: check if seccurity technology package is enable
+R1#show version
+(output)
+
+Technology package license information for module "c1900"
+Technology	Technology-Package		Technology-Package
+		current 	type		next	reboot
+ipbase		ipbasek9	permanent	ipbasek9
+security	none		none		none
+data		none		none		none
+
+STEP2: enable security technology package
+R1(config)#license boot module c1900 technology-package securityk9
+
+STEP3: save the running config and reload router to enable security license
+R1#copy run start
+R1#reload
+
+STEP4: verify security technology package is enabled
+R1#show version
+(output)
+
+Technology package license information for module "c1900"
+Technology	Technology-Package		Technology-Package
+		current 	type		next	reboot
+ipbase		ipbasek9	permanent	ipbasek9
+security	securityk9	evaluation	ecurityk9
+data		none		none		none
+
+STEP5: identify interesting traffic on R1
+R1(config)#access-list 110 permit ip 192.168.1.0 0.0.0.255 192.68.3.0 0.0.0.255
+
+STEP6: configure IKE phase 1 ISAKMP policy on R1
+R1(config)#crypto isakmp policy 10
+R1(config-isakmp)#encryption aes 256
+R1(config-isakmp)#authentication pre-share
+R1(config-isakmp)#group 5
+R1(config-isakmp)#exit
+R1(config)#crypto isakmp key vpnpass address 10.2.2.2
+
+STEP7: configure IKE Phase 2 IPsec Policy on R1
+R1(config)#crypto ipsec transform-set VPN-SET esp-aes esp-sha-hmac
+R1(config)#crypto map VPN-MAP 10 ipsec-isakmp
+R1(config-crypto-map)#description VPN connection to R3
+R1(config-crypto-map)#set peer 10.2.2.2
+R1(config-crypto-map)#set transform-set VPN-SET
+R1(config-crypto-map)#match address 110
+R1(config-crypto-map)#exit
+
+STEP8: configure crypto map outgoing interface
+R1(config)#int se0/1/0
+R1(config-if)#crypto map VPN-MAP
+
+PART3: CONFIGURE IPsec PARAMETER ON R3
+
+STEP1: check if security technology package is enabled
+R3#show version
+(output)
+
+Technology package license information for module "c1900"
+Technology	Technology-Package		Technology-Package
+		current 	type		next	reboot
+ipbase		ipbasek9	permanent	ipbasek9
+security	none		none		none
+data		none		none		none
+
+STEP2: enable security technology package
+R3(config)#license boot module c1900 technology-package securityk9
+
+
+STEP3: save running config of reload router to enable security license
+R3#copy run start
+R3#reload
+
+STEP4: verify security technology package is enabled
+R3#show version
+(output)
+
+Technology package license information for module "c1900"
+Technology	Technology-Package		Technology-Package
+		current 	type		next	reboot
+ipbase		ipbasek9	permanent	ipbasek9
+security	securityk9	solution	ecurityk9
+data		none		none		none
+
+STEP5: Configgure router R3 to support a site-to-site VPN with R1
+R3(config)#access-list 110 permit ip 192.168.0.0 0.0.0.255 192.168.1.0 0.0.0.255
+
+STEP6: configure IKE phase 1 ISAKMP properties on R3
+R3(config)#crypto isakmp policy 10
+R3(config-isakmp)#encryption aes 256
+R3(config-isakmp)#authentication pre-share
+R3(config-isakmp)#group 5
+R3(config-isakmp)#exit
+R3(config)#crypto isakmp key vpnpa55 address 10.1.1.2
+
+STEP7: configure the IkE phase 2 IPsec policy on R3
+R3(config)#crypto ipsec transform-set VPN-SET esp-aes esp-sha-hmac
+R3(config)#crypto map VPN-MAP 10 ipsec-isakmp
+R3(config-crypto-map)#description VPN connection to R1
+R3(config-crypto-map)#set peer 10.1.1.2
+R3(config-crypto-map)#set transform-set VPN-SET
+R3(config-crypto-map)#match address 110
+R3(config-crypto-map)#exit
+
+STEP8: configure crypto map on outgoing interface
+R3(config)#int se0/1/0
+R3(config-if)#crypto map VPN-MAP
+
+PART4: VERIFY THE IPsec VPN
+
+STEP1: verify the tunnel prior to interestng traffic
+R1#show crypto ipsec sa
+(output)
+
+#pkts encaps:0, #pkts encrypt:0, #pkts digest:0
+#pkts decaps:0, #pkts decrypt:0, #pkts verify:0
+
+STEP2: create interesting traffic
+PCC>ping 192.168.1.3 (success)
+
+STEP3: verify tunnel after interesting traffic
+R1#show crypto ipsec sa
+(output)
+
+#pkts encaps:4, #pkts encrypt:4, #pkts digest:0
+#pkts decaps:4, #pkts decrypt:4, #pkts verify:0
+
+STEP4: create uninteresting traffic
+PCB>ping 192.168.1.3 (success)
+R1#ping 192.168.3.3 (success)
+R1#ping 192.168.1.3 (success)
+
+STEP5: verify tunnel
+R1#show crypto ipsec sa
+#pkts encaps:4, #pkts encrypt:4, #pkts digest:0
+#pkts decaps:4, #pkts decrypt:4, #pkts verify:0
